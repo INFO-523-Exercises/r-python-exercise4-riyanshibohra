@@ -370,26 +370,42 @@ results
 # Ridge Regression
 
 ```{r}
-# Convert to data frame
+# Convert the training and testing sets into data frames for ridge regression
+
 train_data <- tibble(y = y_train, X_train5)
 test_data <- tibble(y = y_test, X_test5)
+```
 
-# Set up a Ridge regression model specification
+```{r}
+# Define a ridge regression model with a specified penalty
+
 ridge_spec <- linear_reg(penalty = 0.4, mixture = 1) %>% 
   set_engine("glmnet")
+```
 
-# Fit the model
+```{r}
+# Fit the ridge regression model to the training data
+
 ridge_fit <- ridge_spec %>% 
   fit(y ~ ., data = train_data)
+```
 
-# Make predictions
+```{r}
+# Predict response variables for both training and testing sets using the ridge model
+
+# Making predictions
 y_pred_train_ridge <- predict(ridge_fit, new_data = train_data)$.pred
 y_pred_test_ridge <- predict(ridge_fit, new_data = test_data)$.pred
 
 
-# Make predictions
+# Making predictions
 y_pred_train_ridge <- predict(ridge_fit, new_data = train_data)$.pred
 y_pred_test_ridge <- predict(ridge_fit, new_data = train_data)$.pred
+
+```
+
+```{r}
+# Calculate RMSE for ridge model predictions and extract model coefficients
 
 # Calculate RMSE
 calculate_rmse <- function(actual, predicted) {
@@ -410,37 +426,59 @@ values6 <- tibble(
   Test_error = calculate_rmse(y_test, y_pred_test_ridge),
   Sum_of_Absolute_Weights = sum(abs(ridge_coef))
 )
+```
 
-# Combining the results
+```{r}
+# Combine the ridge regression results into a final summary table
 final_results <- bind_rows(results, values6)
 
 final_results
+
+
+# Interpretation:
+# Ridge regression introduces a penalty term to regularize the model, which helps in handling multicollinearity and overfitting, leading to more robust predictions
 ```
 
 # Lasso Regression
 
 ```{r}
-# Define the lasso specification
+# Define the lasso regression model with a specified penalty
 lasso_spec <- linear_reg(penalty = 0.02, mixture = 1) %>% 
   set_engine("glmnet")
+```
 
-# Ensure the data is combined correctly
+```{r}
+# Prepare the training data in the required format for lasso regression
+
 train_data <- tibble(y = y_train, X1 = X_train5[,1], X2 = X_train5[,2], 
                      X3 = X_train5[,3], X4 = X_train5[,4], X5 = X_train5[,5])
 
-# Fit the model
+```
+
+```{r}
+# Fit the lasso regression model to the training data
+
 lasso_fit <- lasso_spec %>%
   fit(y ~ ., data = train_data)
+```
 
-# Extract coefficients
+```{r}
+# Extract the coefficients from the fitted lasso model
+
 lasso_coefs <- lasso_fit$fit$beta[,1]
+```
 
-# Predictions
+```{r}
+# Predict response variables for training and testing sets using the lasso model
+
 y_pred_train_lasso <- predict(lasso_fit, new_data = train_data)$.pred
-y_pred_test_lasso <- predict(lasso_fit, new_data = tibble(X1 = X_test5[,1], X2 = X_test5[,2], 
-                                                          X3 = X_test5[,3], X4 = X_test5[,4], X5 = X_test5[,5]))$.pred
+y_pred_test_lasso <- predict(lasso_fit, new_data = tibble(X1 = X_test5[,1], X2 = X_test5[,2], X3 = X_test5[,3], X4 = X_test5[,4], X5 = X_test5[,5]))$.pred
 
-# Create the model string
+```
+
+```{r}
+# Convert the lasso model's coefficients into a readable string
+
 model7 <- sprintf("%.2f X + %.2f X2 + %.2f X3 + %.2f X4 + %.2f X5 + %.2f", 
                   lasso_coefs[2], lasso_coefs[3], lasso_coefs[4], 
                   lasso_coefs[5], lasso_coefs[6], lasso_fit$fit$a0[1])
@@ -449,24 +487,36 @@ values7 <- c(model7,
              sqrt(mean((y_train - y_pred_train_lasso)^2)),
              sqrt(mean((y_test - y_pred_test_lasso)^2)),
              sum(abs(lasso_coefs[-1])) + abs(lasso_fit$fit$a0[1]))
+```
 
-# Make the results tibble
+```{r}
+# Compile the lasso regression results into a summary table
+
 lasso_results <- tibble(Model = "Lasso",
                         `Train error` = values7[2], 
                         `Test error` = values7[3], 
                         `Sum of Absolute Weights` = values7[4])
 
 lasso_results
+
+# Interpretation:
+# Lasso regression is effective in feature selection and regularization, reducing overfitting by penalizing the absolute size of the coefficients, which can lead to some coefficients being exactly zero(Feature selection)
 ```
 
 # Hyperparameter Selection via Cross-Validation
 
+## Ridge Regression Model
+
 ```{r}
-# Combine training data
+# Prepare the combined training data in a tibble format for ridge regression
 y_train <- as.vector(y_train)
 
 train_data <- tibble(y = y_train, X1 = X_train5[,1], X2 = X_train5[,2], 
                      X3 = X_train5[,3], X4 = X_train5[,4], X5 = X_train5[,5])
+```
+
+```{r}
+# Set up a normalized recipe and define ridge regression specification for hyperparameter tuning
 
 # Define recipe
 recipe_obj <- recipe(y ~ ., data = train_data) %>%
@@ -476,13 +526,21 @@ recipe_obj <- recipe(y ~ ., data = train_data) %>%
 # Define the ridge specification
 ridge_spec <- linear_reg(penalty = tune(), mixture = 0) %>% 
   set_engine("glmnet")
+```
 
-# Ridge workflow
+```{r}
+# Create a workflow combining the ridge model and recipe for tuning
+
 ridge_wf <- workflow() |>
   add_model(ridge_spec) |>
   add_recipe(recipe_obj)
 
-# Grid of alphas
+```
+
+```{r}
+# Conduct hyperparameter tuning over a range of penalties for ridge regression
+
+# Grid of alphas(penalties)
 alphas <- tibble(penalty = c(0.2, 0.4, 0.6, 0.8, 1.0))
 
 # Tune
@@ -493,24 +551,32 @@ tune_results <-
   grid = alphas
 )
 
-
-# Extract best parameters
+# Extract best parameters for the model
 best_params <- tune_results %>% select_best("rmse")
+```
 
-# Refit the model
+```{r}
+# Refit the ridge regression model using the best tuned hyperparameters
+
+# Refit the model using best_params
 ridge_fit <- ridge_spec %>%
   finalize_model(best_params) %>%
   fit(y ~ ., data = train_data)
 
 # Extract coefficients
 ridge_coefs <- ridge_fit$fit$beta[,1]
+```
 
-# Predictions
+```{r}
+# Predict responses using the refitted ridge model on both training and test data
 y_pred_train_ridge <- predict(ridge_fit, new_data = train_data)$.pred
-y_pred_test_ridge <- predict(ridge_fit, new_data = tibble(X1 = X_test5[,1], X2 = X_test5[,2], 
-                                                          X3 = X_test5[,3], X4 = X_test5[,4], X5 = X_test5[,5]))$.pred
+y_pred_test_ridge <- predict(ridge_fit, new_data = tibble(X1 = X_test5[,1], X2 = X_test5[,2], X3 = X_test5[,3], X4 = X_test5[,4], X5 = X_test5[,5]))$.pred
 
-# Create the model string
+```
+
+```{r}
+# Formulate the ridge regression model's equation using the extracted coefficients
+
 model6 <- sprintf("%.2f X + %.2f X2 + %.2f X3 + %.2f X4 + %.2f X5 + %.2f", 
                   ridge_coefs[2], ridge_coefs[3], ridge_coefs[4], 
                   ridge_coefs[5], ridge_coefs[6], ridge_fit$fit$a0[1])
@@ -520,7 +586,11 @@ values6 <- c(model6,
              sqrt(mean((y_test - y_pred_test_ridge)^2)),
              sum(abs(ridge_coefs[-1])) + abs(ridge_fit$fit$a0[1]))
 
-# Make the results tibble
+```
+
+```{r}
+# Compile a summary table for the ridge regression model including errors and weights
+
 ridge_results <- tibble(Model = "RidgeCV",
                         `Train error` = values6[2], 
                         `Test error` = values6[3], 
@@ -530,19 +600,36 @@ cat("Selected alpha =", best_params$penalty, "\n")
 ```
 
 ```{r}
+# Merge and display the overall results of ridge regression including the selected alpha
+
 all_results <- bind_rows(results, ridge_results)
 all_results
 ```
 
 ```{r}
+# Interpretation:
+# This section perfoormed cross-validation to optimally tune the penalty parameter in ridge regression, enhancing model performance by balancing bias and variance
+```
+
+## Lasso Regression Model
+
+```{r}
+# Set a random seed for reproducibility and ensuring y_train is a vector
 set.seed(1234)
 
 # Ensure y_train is a vector
 y_train <- as.vector(y_train)
+```
 
-# Combine training data
+```{r}
+# Organize the training data into a tibble format for lasso regression
+
 train_data <- tibble(y = y_train, X1 = X_train5[,1], X2 = X_train5[,2], 
                      X3 = X_train5[,3], X4 = X_train5[,4], X5 = X_train5[,5])
+```
+
+```{r}
+# Establish a normalized recipe and set up lasso regression specification for tuning
 
 # Define recipe
 recipe_obj_lasso <- recipe(y ~ ., data = train_data) %>%
@@ -553,6 +640,11 @@ recipe_obj_lasso <- recipe(y ~ ., data = train_data) %>%
 lasso_spec <- linear_reg(penalty = tune(), mixture = 1) %>% 
   set_engine("glmnet")
 
+```
+
+```{r}
+# Construct a workflow for lasso regression, combining the model and recipe
+
 # Lasso workflow
 lasso_wf <- workflow() |>
   add_recipe(recipe_obj_lasso)
@@ -561,6 +653,11 @@ lasso_wf <- workflow() |>
 lasso_fit <- lasso_wf |>
   add_model(lasso_spec) |>
   fit(data = train_data)
+
+```
+
+```{r}
+# Perform hyperparameter tuning for the lasso model across a range of penalty values
 
 # Grid of alphas for Lasso
 lambda_grid <- grid_regular(penalty(), levels = 50)
@@ -575,6 +672,11 @@ tune_results_lasso <-
 # Extract best parameters for Lasso
 best_params_lasso <- tune_results_lasso %>% select_best("rmse")
 
+```
+
+```{r}
+# Refit the lasso model using the optimally tuned hyperparameters(best_params_lasso) using CV
+
 # Refit the model using Lasso
 lasso_fit <- lasso_spec %>%
   finalize_model(best_params_lasso) %>%
@@ -583,12 +685,19 @@ lasso_fit <- lasso_spec %>%
 # Extract coefficients
 lasso_coefs <- lasso_fit$fit$beta[,1]
 
-# Predictions using Lasso
-y_pred_train_lasso <- predict(lasso_fit, new_data = train_data)$.pred
-y_pred_test_lasso <- predict(lasso_fit, new_data = tibble(X1 = X_test5[,1], X2 = X_test5[,2], 
-                                                          X3 = X_test5[,3], X4 = X_test5[,4], X5 = X_test5[,5]))$.pred
+```
 
-# Create the model string for Lasso
+```{r}
+# Generate predictions using the refitted lasso model on training and test datasets
+
+y_pred_train_lasso <- predict(lasso_fit, new_data = train_data)$.pred
+y_pred_test_lasso <- predict(lasso_fit, new_data = tibble(X1 = X_test5[,1], X2 = X_test5[,2], X3 = X_test5[,3], X4 = X_test5[,4], X5 = X_test5[,5]))$.pred
+
+```
+
+```{r}
+# Form the lasso regression model equation with the extracted coefficients
+
 model7 <- sprintf("%.2f X + %.2f X2 + %.2f X3 + %.2f X4 + %.2f X5 + %.2f", 
                   lasso_coefs[2], lasso_coefs[3], lasso_coefs[4], 
                   lasso_coefs[5], lasso_coefs[6], lasso_fit$fit$a0[1])
@@ -598,51 +707,23 @@ values7 <- c(model7,
              sqrt(mean((y_test - y_pred_test_lasso)^2)),
              sum(abs(lasso_coefs[-1])) + abs(lasso_fit$fit$a0[1]))
 
-# Make the results tibble for Lasso
+
+```
+
+```{r}
+# Create a summary table for the lasso model, including model errors and weights
+
 lasso_results <- tibble(Model = "LassoCV",
                         `Train error` = values7[2], 
                         `Test error` = values7[3], 
                         `Sum of Absolute Weights` = values7[4])
 
 cat("Selected alpha for Lasso =", best_params_lasso$penalty, "\n")
-```
 
-```{r}
 lasso_results
 ```
 
 ```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
+# Interpretation
+# Employs cross-validation to find the best penalty value for lasso regression, aiming to improve model accuracy while performing feature selection by shrinking some coefficients to zero
 ```

@@ -22,7 +22,7 @@ pacman::p_load(tidymodels,
 ```
 
 ```{r}
-# Global theme
+# Setting up a global theme
 theme_set(theme_bw() + theme(legend.position = "top"))
 
 ```
@@ -82,10 +82,13 @@ split_obj <- initial_split(data, prop = numTrain/numInstances)
 train_data <- training(split_obj)
 test_data <- testing(split_obj)
 
-# Extract training and testing data from the split object.
+# Extract training and testing data from the split object
+
+# Training sets
 X_train <- train_data$X
 y_train <- train_data$y
 
+# Test sets
 X_test <- test_data$X
 y_test <- test_data$y
 ```
@@ -100,25 +103,41 @@ lin_reg_spec <- linear_reg() |>
 # Fit the linear regression model to the training data
 lin_reg_fit <- lin_reg_spec |> 
   fit(y ~ X, data = train_data)
+
+# Interpretation: 
+# This step involves creating a linear regression model using the training data
+
 ```
 
 ## 3) Apply Model to the Test Set
 
 ```{r}
-# Predict response values for the test set using the fitted model
+# This block applies the model to the test data
+
 y_pred_test <- predict(lin_reg_fit, new_data = test_data) |>
   pull(.pred)
+
+# Interpretation: 
+# Involves predicting the response variable for the test set using the fitted model
+
 ```
 
 ## 4) Evaluate Model Performance on Test Set
 
 ```{r}
+# This block evaluates the performance of the model on the test set
+
 # Create a scatter plot to compare true and predicted values of the response variable for the test set
 ggplot() + 
   geom_point(aes(x = as.vector(y_test), y = y_pred_test), color = 'black') +
   ggtitle('Comparing true and predicted values for test set') +
   xlab('True values for y') +
   ylab('Predicted values for y')
+
+
+# Interpretation: 
+# This part assesses how well the model predicts the response variable on new data
+
 ```
 
 ```{r}
@@ -128,13 +147,14 @@ eval_data <- tibble(
   estimate = y_pred_test
 )
 
-# Calculate and display the Root Mean Squared Error (RMSE) of the model
+# Calculate and display the Root Mean Squared Error (RMSE) and R squared value of the model
 rmse_value <- rmse(data = eval_data, truth = truth, estimate = estimate)
 r2_value <- rsq(eval_data, truth = truth, estimate = estimate)
 ```
 
 ```{r}
 # Output the RMSE and R-squared value to assess the model's goodness of fit
+
 cat("Root mean squared error =", sprintf("%.4f", rmse_value$.estimate), "\n")
 cat('R-squared =', sprintf("%.4f", r2_value$.estimate), "\n")
 ```
@@ -142,11 +162,12 @@ cat('R-squared =', sprintf("%.4f", r2_value$.estimate), "\n")
 ## 5) Postprocessing
 
 ```{r}
+# This block involves postprocessing steps after model evaluation
+
 # Extract and display the slope coefficient from the linear regression model
 coef_values <- coef(lin_reg_fit$fit) 
 slope <- coef_values["X"]
 intercept <- coef_values["(Intercept)"]
-
 
 ```
 
@@ -158,15 +179,18 @@ cat("Intercept =", intercept, "\n")
 ```
 
 ```{r}
-### Step 4: Postprocessing
+# Plot the test data and the predicted linear function, displaying the model's fitted line
 
-# Plot outputs
 ggplot() +
   geom_point(aes(x = as.vector(X_test), y = as.vector(y_test)), color = 'black') +
   geom_line(aes(x = as.vector(X_test), y = y_pred_test), color = 'blue', linewidth = 1) +
   ggtitle(sprintf('Predicted Function: y = %.2fX + %.2f', slope, intercept)) +
   xlab('X') +
   ylab('y')
+
+
+# Interpretation: 
+# Includes examining the model’s coefficients and other outputs to understand the model better
 ```
 
 # Effect of Correlated Attributes
@@ -174,14 +198,18 @@ ggplot() +
 ## Create correlated attributes
 
 ```{r}
-# Generate the variables
+# Generate additional predictor variables (X2, X3, X4, X5) that are correlated with each other
 set.seed(1)
 X2 <- 0.5 * X + rnorm(numInstances, mean=0, sd=0.04)
 X3 <- 0.5 * X2 + rnorm(numInstances, mean=0, sd=0.01)
 X4 <- 0.5 * X3 + rnorm(numInstances, mean=0, sd=0.01)
 X5 <- 0.5 * X4 + rnorm(numInstances, mean=0, sd=0.01)
 
-# Create plots
+```
+
+```{r}
+# Create and display scatter plots to visualize correlations between each pair of generated variables
+
 plot1 <- ggplot() +
   geom_point(aes(X, X2), color='black') +
   xlab('X') + ylab('X2') +
@@ -202,12 +230,13 @@ plot4 <- ggplot() +
   xlab('X4') + ylab('X5') +
   ggtitle(sprintf("Correlation between X4 and X5 = %.4f", cor(X4[-c((numInstances-numTest+1):numInstances)], X5[-c((numInstances-numTest+1):numInstances)])))
 
-# Combine plots into a 2x2 grid
+# Combine plots 
 grid.arrange(plot1, plot2, plot3, plot4, ncol=2)
 ```
 
 ```{r}
-# Split data into training and testing sets
+# Split the dataset with correlated variables into training and test sets
+
 train_indices <- 1:(numInstances - numTest)
 test_indices <- (numInstances - numTest + 1):numInstances
 
@@ -226,13 +255,18 @@ X_test5 <- cbind(X[test_indices], X2[test_indices], X3[test_indices], X4[test_in
 ```
 
 ```{r}
-# Convert matrices to tibbles for training
+# Convert the training data matrices into tibble format for each model with increasing number of predictors
+
 train_data2 <- tibble(X1 = X_train2[,1], X2 = X_train2[,2], y = y_train)
 train_data3 <- tibble(X1 = X_train3[,1], X2 = X_train3[,2], X3 = X_train3[,3], y = y_train)
 train_data4 <- tibble(X1 = X_train4[,1], X2 = X_train4[,2], X3 = X_train4[,3], X4 = X_train4[,4], y = y_train)
 train_data5 <- tibble(X1 = X_train5[,1], X2 = X_train5[,2], X3 = X_train5[,3], X4 = X_train5[,4], X5 = X_train5[,5], y = y_train)
 
-# Train models
+```
+
+```{r}
+# Fit linear regression models for each set of predictors, and adding more correlated variables
+
 regr2_spec <- linear_reg() %>% set_engine("lm")
 regr2_fit <- regr2_spec %>% fit(y ~ X1 + X2, data = train_data2)
 
@@ -247,7 +281,8 @@ regr5_fit <- regr5_spec %>% fit(y ~ X1 + X2 + X3 + X4 + X5, data = train_data5)
 ```
 
 ```{r}
-# Convert matrices to data.frames for predictions
+# Convert training and test data matrices into data frames and perform predictions using the trained models
+
 new_train_data2 <- setNames(as.data.frame(X_train2), c("X1", "X2"))
 new_test_data2 <- setNames(as.data.frame(X_test2), c("X1", "X2"))
 
@@ -275,6 +310,8 @@ y_pred_test5 <- predict(regr5_fit, new_data = new_test_data5)
 ```
 
 ```{r}
+# Extract model coefficients, calculate RMSE for train and test sets, and compute the sum of absolute weights for each model
+
 # Extract coefficients and intercepts
 get_coef <- function(model) {
   coef <- coefficients(model$fit)
@@ -309,7 +346,11 @@ results <- tibble(
                               sum(abs(get_coef(regr5_fit))))
 )
 
-# Plotting
+```
+
+```{r}
+# Visualize the relationship between model complexity (sum of absolute weights) and error rates for training and testing sets
+
 ggplot(results, aes(x = Sum_of_Absolute_Weights)) +
   geom_line(aes(y = Train_error, color = "Train error"), linetype = "solid") +
   geom_line(aes(y = Test_error, color = "Test error"), linetype = "dashed") +
@@ -318,7 +359,12 @@ ggplot(results, aes(x = Sum_of_Absolute_Weights)) +
 ```
 
 ```{r}
+# Output a summary table of model equations, error rates, and sum of absolute weights
+
 results
+
+# Interpretation:
+# The code focused on the impact of adding correlated predictors to linear regression models, revealing the trade-off between model complexity and accuracy in predictions
 ```
 
 # Ridge Regression
